@@ -42,7 +42,7 @@ async function startBot() {
         },
     });
 
-    // --- PAIRING CODE SYSTEM (FIXED FOR TERMUX/VPS) ---
+    // --- PAIRING CODE SYSTEM (STABLE) ---
     if (!sock.authState.creds.registered) {
         console.log(chalk.white.bgRed.bold(" [ CONNECTION SYSTEM ] "));
         
@@ -56,7 +56,6 @@ async function startBot() {
         
         const cleanedNumber = phoneNumber.replace(/[^0-9]/g, '');
         
-        // Wait for socket to initialize before requesting code
         setTimeout(async () => {
             try {
                 let code = await sock.requestPairingCode(cleanedNumber);
@@ -68,7 +67,6 @@ async function startBot() {
         }, 3000);
     }
 
-    // Save Credentials whenever updated
     sock.ev.on('creds.update', saveCreds);
 
     // Connection Monitor
@@ -83,46 +81,58 @@ async function startBot() {
         }
     });
 
-    // --- PLUGIN HANDLER (FIXED ARGUMENT ORDER) ---
+    // --- PLUGIN HANDLER (STRICT VALIDATION) ---
     sock.ev.on('messages.upsert', async ({ messages }) => {
-        const msg = messages[0];
-        if (!msg.message || msg.key.fromMe) return;
+        try {
+            const msg = messages[0];
+            if (!msg.message || msg.key.fromMe) return;
 
-        const from = msg.key.remoteJid;
-        const content = msg.message.conversation || 
-                        msg.message.extendedTextMessage?.text || 
-                        msg.message.imageMessage?.caption || 
-                        msg.message.videoMessage?.caption || "";
+            // STRICT JID CHECK: Prevents the sendMessage(undefined) crash
+            const from = msg.key.remoteJid;
+            if (!from || typeof from !== 'string' || from === 'status@broadcast') return;
 
-        const pluginDir = path.join(__dirname, 'plugins');
-        
-        if (fs.existsSync(pluginDir)) {
-            const pluginFiles = fs.readdirSync(pluginDir).filter(file => file.endsWith('.js'));
+            // Extract content safely
+            const content = msg.message.conversation || 
+                            msg.message.extendedTextMessage?.text || 
+                            msg.message.imageMessage?.caption || 
+                            msg.message.videoMessage?.caption || "";
+
+            const pluginDir = path.join(__dirname, 'plugins');
             
-            for (const file of pluginFiles) {
-                const pluginPath = path.join(pluginDir, file);
+            if (fs.existsSync(pluginDir)) {
+                const pluginFiles = fs.readdirSync(pluginDir).filter(file => file.endsWith('.js'));
                 
-                // Clear cache so plugin updates don't require restart
-                delete require.cache[require.resolve(pluginPath)];
-                const plugin = require(pluginPath);
-
-                // Command check
-                if (content.startsWith(plugin.command)) {
+                for (const file of pluginFiles) {
+                    const pluginPath = path.join(pluginDir, file);
+                    
                     try {
-                        // Correct Argument Order: (sock, from, msg, content, FOOTER)
-                        await plugin.execute(sock, from, msg, content, FOOTER);
-                    } catch (err) {
-                        console.error(chalk.red(`[Error in ${file}]:`), err);
+                        // Refresh plugin cache
+                        delete require.cache[require.resolve(pluginPath)];
+                        const plugin = require(pluginPath);
+
+                        // Trigger command if prefix matches
+                        if (content.startsWith(plugin.command)) {
+                            // Standard Argument Order: (sock, from, msg, content, FOOTER)
+                            await plugin.execute(sock, from, msg, content, FOOTER);
+                        }
+                    } catch (pluginErr) {
+                        console.error(chalk.red(`[Plugin Error in ${file}]:`), pluginErr.message);
                     }
                 }
             }
+        } catch (upsertErr) {
+            console.error(chalk.red("[Upsert Error]:"), upsertErr.message);
         }
     });
 }
 
-// Global error handling to prevent bot from crashing
+// Global process error catchers to keep the bot alive on VPS
 process.on('uncaughtException', (err) => {
-    console.error('CRITICAL ERROR:', err);
+    console.error(chalk.red('FATAL ERROR (Uncaught):'), err.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error(chalk.red('FATAL ERROR (Unhandled Rejection):'), reason);
 });
 
 startBot();
