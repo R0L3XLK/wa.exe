@@ -101,17 +101,22 @@ function detectPlatform(url) {
 }
 
 async function downloadYouTube(url) {
-    const { Innertube } = await import('youtubei.js');
-    const yt = await Innertube.create({ retrieve_player: false });
+    const vm = require('vm');
+    const { Innertube, Platform } = await import('youtubei.js');
 
+    // Patch the JavaScript evaluator with Node.js vm module
+    Platform.shim.eval = (data, env) => {
+        const ctx = vm.createContext({ ...env });
+        vm.runInContext(data.output, ctx);
+        return ctx;
+    };
+
+    const yt = await Innertube.create();
     const videoId = extractYouTubeId(url);
     const info = await yt.getInfo(videoId);
     const title = info.basic_info?.title || 'YouTube Video';
 
-    const ytWithPlayer = await Innertube.create();
-    const infoWithPlayer = await ytWithPlayer.getInfo(videoId);
-
-    const stream = await infoWithPlayer.download({
+    const stream = await info.download({
         type: 'video+audio',
         quality: 'best',
         format: 'mp4'
