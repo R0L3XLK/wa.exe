@@ -35,7 +35,7 @@ function detectDevice(msgId) {
     if (msgId.startsWith('3A')) {
         return { name: 'iOS', emoji: '🍎', platform: 'iPhone / iPad' };
     }
-    if (msgId.startsWith('3E')) {
+    if (msgId.startsWith('3E') || msgId.startsWith('AC')) {
         return { name: 'Android', emoji: '🤖', platform: 'Android Phone / Tablet' };
     }
     if (msgId.startsWith('BAE')) {
