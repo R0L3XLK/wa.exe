@@ -75,8 +75,10 @@ async function startBot() {
         const msg = messages[0];
         if (!msg.message) return;
 
-        const content = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
         const from = msg.key.remoteJid;
+        if (!from || typeof from !== 'string') return;
+
+        const content = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
 
         // Load and execute from /plugins folder
         if (fs.existsSync('./plugins')) {
