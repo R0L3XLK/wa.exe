@@ -1,40 +1,38 @@
 module.exports = {
-    command: '.tt',
+    command: '.tiktok',
     execute: async (sock, from, msg, content, FOOTER) => {
         try {
-            const args = content.trim().split(/\s+/);
-            let url = args[1];
+            let url = content.replace('.tiktok', '').trim();
 
             if (!url) {
                 const quotedText = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation ||
                                  msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.extendedTextMessage?.text || '';
-                url = quotedText.match(/https?:\/\/[^\s]+/)?.[0];
+                url = quotedText.trim();
             }
 
             if (!url || !url.includes('tiktok.com')) {
-                return await sock.sendMessage(from, { text: `⚠️ Please provide a valid TikTok link.${FOOTER}` });
+                return sock.sendMessage(from, { text: "⚠️ Please provide a TikTok link or reply to one." + FOOTER });
             }
 
-            await sock.sendMessage(from, { text: `⏳ Fetching TikTok Video...${FOOTER}` });
+            await sock.sendMessage(from, { text: "⏳ Downloading TikTok Video..." });
 
-            // Using AIO API for TikTok
+            // Fetch from a stable AIO API
             const apiUrl = `https://api.giftedtech.my.id/api/download/tiktok?url=${encodeURIComponent(url)}`;
-            const response = await fetch(apiUrl);
-            const json = await response.json();
+            const response = await fetch(apiUrl).then(res => res.json());
 
-            if (!json.success) throw new Error("Could not find TikTok video.");
+            if (!response.success) throw new Error("TikTok video not found.");
 
-            const videoUrl = json.result.video_no_watermark || json.result.video;
-            const videoRes = await fetch(videoUrl);
-            const buffer = Buffer.from(await videoRes.arrayBuffer());
+            // Logic: Prefer No-Watermark (HD) if available
+            const videoUrl = response.result.video_no_watermark || response.result.video;
+            const buffer = Buffer.from(await (await fetch(videoUrl)).arrayBuffer());
 
             await sock.sendMessage(from, { 
                 video: buffer, 
-                caption: `✅ *TikTok Downloaded*${FOOTER}` 
+                caption: `✅ *TikTok Downloaded Successfully*` + FOOTER 
             }, { quoted: msg });
 
         } catch (e) {
-            await sock.sendMessage(from, { text: `❌ TikTok Error: ${e.message}` });
+            sock.sendMessage(from, { text: `❌ TikTok Error: ${e.message}` });
         }
     }
 };
