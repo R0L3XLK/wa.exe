@@ -1,5 +1,5 @@
 module.exports = {
-    command: '.d',
+    command: '.sys',
     execute: async (sock, from, msg, content, FOOTER) => {
         try {
             // Extract the quoted message's context
