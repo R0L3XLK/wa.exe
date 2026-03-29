@@ -107,7 +107,7 @@ async function downloadYouTube(url) {
     // Patch the JavaScript evaluator with Node.js vm module
     Platform.shim.eval = (data, env) => {
         const ctx = vm.createContext({ ...env });
-        vm.runInContext(data.output, ctx);
+        vm.runInContext(`(function(){${data.output}})()`, ctx);
         return ctx;
     };
 
