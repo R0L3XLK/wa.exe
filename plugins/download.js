@@ -107,20 +107,20 @@ async function downloadYouTube(url) {
     // Patch the JavaScript evaluator with Node.js vm module
     Platform.shim.eval = (data, env) => {
         const ctx = vm.createContext({ ...env });
-        vm.runInContext(`(function(){${data.output}})()`, ctx);
-        return ctx;
+        const result = vm.runInContext(`(function(){${data.output}})()`, ctx);
+        return result;
     };
 
     const yt = await Innertube.create({ generate_session_locally: true });
     const videoId = extractYouTubeId(url);
-    const info = await yt.getInfo(videoId, 'ANDROID');
+    const info = await yt.getInfo(videoId, 'IOS');
     const title = info.basic_info?.title || 'YouTube Video';
 
     const stream = await info.download({
         type: 'video+audio',
         quality: 'best',
         format: 'mp4',
-        client: 'ANDROID'
+        client: 'IOS'
     });
 
     const chunks = [];
