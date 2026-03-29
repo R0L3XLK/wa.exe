@@ -28,7 +28,7 @@ module.exports = {
             try {
                 dp = await sock.profilePictureUrl(target, 'image');
             } catch {
-                dp = 'https://telegra.ph/file/89c1640700b7cf657371d.jpg'; // Placeholder
+                dp = 'https://upload.wikimedia.org/wikipedia/commons/a/ac/Default_pfp.jpg'; // Placeholder
             }
 
             const contact = await sock.onWhatsApp(target);
