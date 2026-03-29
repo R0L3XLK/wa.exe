@@ -2,87 +2,75 @@ const fs = require('fs');
 
 module.exports = {
     command: '.dl',
-    execute: async (sock, msg, from, body, FOOTER) => {
-        const args = body.trim().split(/\s+/);
-        let url = args[1];
-
-        if (!url) {
-            const quotedText =
-                msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation ||
-                msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.extendedTextMessage?.text || '';
-            url = extractUrl(quotedText);
-        }
-
-        if (!url) {
-            await sock.sendMessage(from, {
-                text: `⚠️ Provide a URL or reply to a message with one.\n\n*Usage:* \`.dl <url>\`\n\n*Supported:* YouTube, TikTok, Instagram, Twitter, Reddit, SoundCloud & more.${FOOTER}`
-            });
-            return;
-        }
-
-        await sock.sendMessage(from, { text: `⏳ Downloading...\n🔗 ${url}${FOOTER}` });
-
+    execute: async (sock, from, msg, content, FOOTER) => {
         try {
+            const args = content.trim().split(/\s+/);
+            let url = args[1];
+            let type = args[2]?.toLowerCase(); // mp3 or mp4
+
+            // 1. Extract URL from reply if not in command
+            if (!url) {
+                const quotedText =
+                    msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation ||
+                    msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.extendedTextMessage?.text || '';
+                url = extractUrl(quotedText);
+            }
+
+            if (!url) {
+                return await sock.sendMessage(from, {
+                    text: `⚠️ *Usage:* \`.dl <url> <type>\`\n\n*Example:* \`.dl https://youtu.be/xxx mp3\`\n\n*Supported:* YouTube, TikTok (more coming soon)${FOOTER}`
+                }, { quoted: msg });
+            }
+
+            // 2. Default to mp4 if type is missing
+            if (!type || !['mp3', 'mp4'].includes(type)) {
+                type = 'mp4'; 
+            }
+
+            await sock.sendMessage(from, { text: `⏳ Downloading *${type.toUpperCase()}*...\n🔗 ${url}${FOOTER}` });
+
             const platform = detectPlatform(url);
             let result = null;
 
             if (platform === 'youtube') {
-                result = await downloadYouTube(url);
+                result = await downloadYouTube(url, type);
             } else if (platform === 'tiktok') {
-                result = await downloadTikTok(url);
+                result = await downloadTikTok(url); // TikTok is usually just mp4
             } else {
-                await sock.sendMessage(from, {
-                    text: `❌ Unsupported platform. Currently supported:\n• YouTube\n• TikTok${FOOTER}`
+                return await sock.sendMessage(from, {
+                    text: `❌ Unsupported platform. Currently supporting YouTube & TikTok.${FOOTER}`
                 });
-                return;
             }
 
-            if (!result) throw new Error('No downloadable content found.');
+            if (!result || !result.buffer) throw new Error('Could not retrieve media.');
 
-            const { buffer, mimeType, title } = result;
+            const { buffer, title } = result;
             const sizeMB = buffer.length / (1024 * 1024);
 
-            if (mimeType.startsWith('video/')) {
-                if (sizeMB > 64) {
-                    await sock.sendMessage(from, { text: `❌ File too large (${sizeMB.toFixed(1)} MB). Max 64 MB for video.${FOOTER}` });
-                    return;
-                }
+            // 3. Send Logic based on Type
+            if (type === 'mp3') {
+                if (sizeMB > 50) throw new Error("Audio is too large (Max 50MB)");
+                
+                await sock.sendMessage(from, {
+                    audio: buffer,
+                    mimetype: 'audio/mpeg',
+                    ptt: false,
+                    fileName: `${title}.mp3`
+                }, { quoted: msg });
+                
+            } else {
+                if (sizeMB > 100) throw new Error("Video is too large (Max 100MB)");
+
                 await sock.sendMessage(from, {
                     video: buffer,
-                    mimetype: mimeType,
-                    caption: `✅ ${title || 'Downloaded'}${FOOTER}`
-                });
-            } else if (mimeType.startsWith('audio/')) {
-                if (sizeMB > 16) {
-                    await sock.sendMessage(from, {
-                        document: buffer,
-                        mimetype: mimeType,
-                        fileName: `${title || 'audio'}.mp3`,
-                        caption: `✅ ${title || 'Downloaded'}${FOOTER}`
-                    });
-                } else {
-                    await sock.sendMessage(from, {
-                        audio: buffer,
-                        mimetype: mimeType,
-                        ptt: false
-                    });
-                }
-            } else if (mimeType.startsWith('image/')) {
-                await sock.sendMessage(from, {
-                    image: buffer,
-                    caption: `✅ ${title || 'Downloaded'}${FOOTER}`
-                });
-            } else {
-                await sock.sendMessage(from, {
-                    document: buffer,
-                    mimetype: mimeType || 'application/octet-stream',
-                    fileName: `${title || 'download'}`,
-                    caption: `✅ ${title || 'Downloaded'}${FOOTER}`
-                });
+                    mimetype: 'video/mp4',
+                    caption: `✅ *${title}*\n📦 Size: ${sizeMB.toFixed(2)} MB${FOOTER}`
+                }, { quoted: msg });
             }
+
         } catch (err) {
-            console.error('[dl plugin]', err.message);
-            await sock.sendMessage(from, { text: `❌ Failed: ${err.message}${FOOTER}` });
+            console.error('[dl plugin error]', err);
+            await sock.sendMessage(from, { text: `❌ *Error:* ${err.message}${FOOTER}` });
         }
     }
 };
@@ -94,33 +82,23 @@ function extractUrl(text) {
 function detectPlatform(url) {
     if (/youtube\.com|youtu\.be/.test(url)) return 'youtube';
     if (/tiktok\.com/.test(url)) return 'tiktok';
-    if (/instagram\.com/.test(url)) return 'instagram';
-    if (/twitter\.com|x\.com/.test(url)) return 'twitter';
-    if (/reddit\.com/.test(url)) return 'reddit';
     return 'unknown';
 }
 
-async function downloadYouTube(url) {
-    const vm = require('vm');
-    const { Innertube, Platform } = await import('youtubei.js');
+async function downloadYouTube(url, type) {
+    // Note: youtubei.js requires 'vm' for signature decryption
+    const { Innertube } = await import('youtubei.js');
+    const yt = await Innertube.create();
+    
+    const videoId = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1] || url;
+    const info = await yt.getInfo(videoId);
+    const title = info.basic_info?.title || 'YouTube_Media';
 
-    // Patch the JavaScript evaluator with Node.js vm module
-    Platform.shim.eval = (data, env) => {
-        const ctx = vm.createContext({ ...env });
-        const result = vm.runInContext(`(function(){${data.output}})()`, ctx);
-        return result;
-    };
-
-    const yt = await Innertube.create({ generate_session_locally: true });
-    const videoId = extractYouTubeId(url);
-    const info = await yt.getInfo(videoId, 'IOS');
-    const title = info.basic_info?.title || 'YouTube Video';
-
+    const format = type === 'mp3' ? 'audio' : 'video+audio';
     const stream = await info.download({
-        type: 'video+audio',
+        type: format,
         quality: 'best',
-        format: 'mp4',
-        client: 'IOS'
+        format: 'mp4'
     });
 
     const chunks = [];
@@ -128,12 +106,7 @@ async function downloadYouTube(url) {
         chunks.push(Buffer.from(chunk));
     }
 
-    return { buffer: Buffer.concat(chunks), mimeType: 'video/mp4', title };
-}
-
-function extractYouTubeId(url) {
-    const match = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    return match?.[1] || url;
+    return { buffer: Buffer.concat(chunks), title };
 }
 
 async function downloadTikTok(url) {
@@ -141,21 +114,9 @@ async function downloadTikTok(url) {
     const result = await Tiktok.Downloader(url, { version: 'v1' });
 
     if (result.status !== 'success') throw new Error('TikTok download failed');
-
     const videoUrl = result.result?.video?.[0] || result.result?.video2?.[0];
-    if (!videoUrl) throw new Error('No video URL in TikTok response');
-
-    const { buffer, mimeType } = await fetchBuffer(videoUrl);
-    const title = result.result?.description || 'TikTok Video';
-    return { buffer, mimeType: mimeType || 'video/mp4', title };
-}
-
-async function fetchBuffer(url) {
-    const res = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36' }
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status} fetching media`);
-    const mimeType = (res.headers.get('content-type') || 'video/mp4').split(';')[0].trim();
+    
+    const res = await fetch(videoUrl);
     const buffer = Buffer.from(await res.arrayBuffer());
-    return { buffer, mimeType };
+    return { buffer, title: result.result?.description || 'TikTok' };
 }
