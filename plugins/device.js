@@ -35,6 +35,9 @@ function detectDevice(msgId) {
     if (msgId.startsWith('3A')) {
         return { name: 'iOS', emoji: '🍎', platform: 'iPhone / iPad' };
     }
+    if (msgId.startsWith('3EB')) {
+        return { name: 'WhatsApp Web / Bot', emoji: '💻', platform: 'Browser / Windows / Mac / Linux / Bot' };
+    }
     if (msgId.startsWith('3E') || msgId.startsWith('AC')) {
         return { name: 'Android', emoji: '🤖', platform: 'Android Phone / Tablet' };
     }
