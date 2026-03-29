@@ -1,53 +1,63 @@
-module.exports = {
-    command: '.yt',
-    execute: async (sock, from, msg, content, FOOTER) => {
-        try {
-            const args = content.trim().split(/\s+/);
-            const subCommand = args[0]; // .yta or .ytv
-            let url = args[1];
+const ytIdRegex = /(?:http(?:s|):\/\/|)(?:(?:www\.|)youtube(?:\-nocookie|)\.com\/(?:watch\?.*(?:|\&)v=|embed|shorts\/|v\/)|youtu\.be\/)([-_0-9A-Za-z]{11})/;
 
-            // 1. Get URL from reply if not provided
-            if (!url) {
+module.exports = {
+    command: '.', // Logic handles .yta and .ytv
+    execute: async (sock, from, msg, content, FOOTER) => {
+        const cmd = content.toLowerCase().split(/\s+/)[0];
+        if (cmd !== '.yta' && cmd !== '.ytv') return;
+
+        try {
+            let input = content.replace(cmd, '').trim();
+            
+            // 1. Handle Reply logic
+            if (!input) {
                 const quotedText = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation ||
                                  msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.extendedTextMessage?.text || '';
-                url = quotedText.match(/https?:\/\/[^\s]+/)?.[0];
+                input = quotedText.trim();
             }
 
-            if (!url) {
-                return await sock.sendMessage(from, { 
-                    text: `⚠️ *Usage:* \n.ytv <url> (for Video)\n.yta <url> (for Audio)${FOOTER}` 
-                }, { quoted: msg });
+            if (!input) return sock.sendMessage(from, { text: `⚠️ Usage: *${cmd} <url or search>*` + FOOTER });
+
+            await sock.sendMessage(from, { text: `⏳ Searching & Processing...` });
+
+            // 2. Resolve URL or Search Query
+            let url = input;
+            if (!ytIdRegex.test(input)) {
+                // If it's not a URL, use a search API to find the first video
+                const searchApi = `https://api.giftedtech.my.id/api/search/youtube?query=${encodeURIComponent(input)}`;
+                const sRes = await fetch(searchApi).then(res => res.json());
+                if (!sRes.success || !sRes.result[0]) throw new Error("No results found.");
+                url = sRes.result[0].url;
             }
 
-            await sock.sendMessage(from, { text: `⏳ Processing YouTube Request...${FOOTER}` });
+            // 3. Download using the API (Compatible with your 'y2mate' style logic)
+            const type = cmd === '.yta' ? 'mp3' : 'mp4';
+            const dlApi = `https://api.giftedtech.my.id/api/download/dlmp4?url=${encodeURIComponent(url)}`;
+            const dlRes = await fetch(dlApi).then(res => res.json());
 
-            // 2. Fetch from Public API
-            const apiUrl = `https://api.giftedtech.my.id/api/download/ytmp4?url=${encodeURIComponent(url)}`;
-            const response = await fetch(apiUrl);
-            const json = await response.json();
+            if (!dlRes.success) throw new Error("API failed to fetch media.");
 
-            if (!json.success) throw new Error("Video not found or API error.");
+            const data = dlRes.result;
+            const mediaUrl = cmd === '.yta' ? data.download_url_audio || data.download_url : data.download_url;
+            const mediaBuffer = Buffer.from(await (await fetch(mediaUrl)).arrayBuffer());
 
-            const data = json.result;
-            const mediaRes = await fetch(subCommand === '.yta' ? data.download_url_audio : data.download_url);
-            const buffer = Buffer.from(await mediaRes.arrayBuffer());
-
-            // 3. Send as Audio or Video
-            if (subCommand === '.yta') {
+            // 4. Send to User
+            if (cmd === '.yta') {
                 await sock.sendMessage(from, { 
-                    audio: buffer, 
+                    audio: mediaBuffer, 
                     mimetype: 'audio/mpeg', 
                     fileName: `${data.title}.mp3` 
                 }, { quoted: msg });
             } else {
                 await sock.sendMessage(from, { 
-                    video: buffer, 
-                    caption: `✅ *${data.title}*${FOOTER}` 
+                    video: mediaBuffer, 
+                    caption: `✅ *${data.title}*` + FOOTER 
                 }, { quoted: msg });
             }
 
         } catch (e) {
-            await sock.sendMessage(from, { text: `❌ Error: ${e.message}` });
+            console.error(e);
+            sock.sendMessage(from, { text: `❌ Error: ${e.message}` });
         }
     }
 };
