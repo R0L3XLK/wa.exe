@@ -111,15 +111,16 @@ async function downloadYouTube(url) {
         return ctx;
     };
 
-    const yt = await Innertube.create();
+    const yt = await Innertube.create({ generate_session_locally: true });
     const videoId = extractYouTubeId(url);
-    const info = await yt.getInfo(videoId);
+    const info = await yt.getInfo(videoId, 'ANDROID');
     const title = info.basic_info?.title || 'YouTube Video';
 
     const stream = await info.download({
         type: 'video+audio',
         quality: 'best',
-        format: 'mp4'
+        format: 'mp4',
+        client: 'ANDROID'
     });
 
     const chunks = [];
