@@ -87,7 +87,11 @@ async function startBot() {
                 const plugin = require(`./plugins/${file}`);
                 // Simple command check (e.g., if content starts with .ping)
                 if (content.startsWith(plugin.command)) {
-                    await plugin.execute(sock, msg, from, content, FOOTER);
+                    try {
+                        await plugin.execute(sock, msg, from, content, FOOTER);
+                    } catch (err) {
+                        console.error(`[Plugin Error] ${file}:`, err.message);
+                    }
                 }
             }
         }
