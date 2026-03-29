@@ -73,7 +73,7 @@ async function startBot() {
     // Plugin Handler
     sock.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0];
-        if (!msg.message || msg.key.fromMe) return;
+        if (!msg.message) return;
 
         const content = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
         const from = msg.key.remoteJid;
