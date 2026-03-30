@@ -14,9 +14,11 @@ module.exports = {
   *.sys*   — Detect device (reply to a msg)
 
 ━━━━━ 📥 *DOWNLOADER* ━━━━━
-  *.tiktok* <url>  — Download TikTok video (no watermark)
-  *.ytv* <url>     — Download YouTube video (MP4, max 720p)
-  *.yta* <url>     — Download YouTube audio (MP3)
+  *.ytv* <url>     — YouTube video (MP4)
+  *.yta* <url>     — YouTube audio (MP3)
+  *.ig*  <url>     — Instagram post/reel
+  *.fb*  <url>     — Facebook video
+  *.tt*  <url>     — TikTok (no watermark)
 
 💡 *Tip:* Reply to any link instead of typing the URL.`;
 
