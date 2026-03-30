@@ -1,6 +1,6 @@
 module.exports = {
     command: '.tiktok',
-    execute: async (sock, from, msg, content, FOOTER) => {
+    execute: async (sock, msg, from, content, FOOTER) => {
         try {
             let url = content.replace('.tiktok', '').trim();
 

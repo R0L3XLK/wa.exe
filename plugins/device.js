@@ -1,6 +1,6 @@
 module.exports = {
     command: '.sys',
-    execute: async (sock, from, msg, content, FOOTER) => {
+    execute: async (sock, msg, from, content, FOOTER) => {
         try {
             // Extract the quoted message's context
             const contextInfo = msg.message?.extendedTextMessage?.contextInfo;

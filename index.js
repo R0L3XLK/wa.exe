@@ -111,7 +111,8 @@ async function startBot() {
                         const plugin = require(pluginPath);
 
                         // Trigger command if prefix matches
-                        if (content.split(' ')[0] === plugin.command) {
+                        const cmds = Array.isArray(plugin.command) ? plugin.command : [plugin.command];
+                        if (cmds.includes(content.split(' ')[0])) {
                             await plugin.execute(sock, msg, from, content, FOOTER);
                         }
                     } catch (pluginErr) {

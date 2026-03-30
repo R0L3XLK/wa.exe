@@ -1,10 +1,9 @@
 const ytIdRegex = /(?:http(?:s|):\/\/|)(?:(?:www\.|)youtube(?:\-nocookie|)\.com\/(?:watch\?.*(?:|\&)v=|embed|shorts\/|v\/)|youtu\.be\/)([-_0-9A-Za-z]{11})/;
 
 module.exports = {
-    command: '.', // Handles both .yta and .ytv
-    execute: async (sock, from, msg, content, FOOTER) => {
+    command: ['.yta', '.ytv'],
+    execute: async (sock, msg, from, content, FOOTER) => {
         const cmd = content.toLowerCase().split(/\s+/)[0];
-        if (cmd !== '.yta' && cmd !== '.ytv') return;
 
         try {
             let input = content.replace(cmd, '').trim();
