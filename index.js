@@ -11,11 +11,15 @@ const chalk = require("chalk");
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
+const { ensureYtDlp } = require("./setup");
 
 // Global Constants
 const FOOTER = "\n\n> wa.exe created by R O L E X - LK";
 
 async function startBot() {
+    // Ensure yt-dlp binary is available before starting
+    await ensureYtDlp().catch(e => console.warn(chalk.yellow('[Setup Warning] yt-dlp setup failed:', e.message)));
+
     const { state, saveCreds } = await useMultiFileAuthState('session');
     const { version } = await fetchLatestBaileysVersion();
 

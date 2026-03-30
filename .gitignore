@@ -1,4 +1,6 @@
 node_modules
 .npm
-package-lock.jsonnode_modules
+package-lock.json
+bin/
+session/
 

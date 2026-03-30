@@ -14,11 +14,11 @@ module.exports = {
   *.sys*   — Detect device (reply to a msg)
 
 ━━━━━ 📥 *DOWNLOADER* ━━━━━
-  *.tiktok* <url>  — Download TikTok video
-  *.ytv* <url>     — Download YouTube video
+  *.tiktok* <url>  — Download TikTok video (no watermark)
+  *.ytv* <url>     — Download YouTube video (MP4, max 720p)
   *.yta* <url>     — Download YouTube audio (MP3)
 
-💡 *Tip:* You can also reply to a link instead of typing the URL.`;
+💡 *Tip:* Reply to any link instead of typing the URL.`;
 
         await sock.sendMessage(from, { text: menu + FOOTER }, { quoted: msg });
     }
