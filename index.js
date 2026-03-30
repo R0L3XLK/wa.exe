@@ -85,7 +85,7 @@ async function startBot() {
     sock.ev.on('messages.upsert', async ({ messages }) => {
         try {
             const msg = messages[0];
-            if (!msg.message || msg.key.fromMe) return;
+            if (!msg.message) return;
 
             // STRICT JID CHECK: Prevents the sendMessage(undefined) crash
             const from = msg.key.remoteJid;
@@ -111,9 +111,8 @@ async function startBot() {
                         const plugin = require(pluginPath);
 
                         // Trigger command if prefix matches
-                        if (content.startsWith(plugin.command)) {
-                            // Standard Argument Order: (sock, from, msg, content, FOOTER)
-                            await plugin.execute(sock, from, msg, content, FOOTER);
+                        if (content.split(' ')[0] === plugin.command) {
+                            await plugin.execute(sock, msg, from, content, FOOTER);
                         }
                     } catch (pluginErr) {
                         console.error(chalk.red(`[Plugin Error in ${file}]:`), pluginErr.message);
