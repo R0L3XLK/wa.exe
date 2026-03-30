@@ -1,4 +1,4 @@
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -35,17 +35,27 @@ module.exports = {
         });
 
         const tmpDir = os.tmpdir();
-        const tmpFile = path.join(tmpDir, `wa_yt_${Date.now()}`);
+        const stamp = Date.now();
+        const outTemplate = path.join(tmpDir, `wa_yt_${stamp}`);
 
         try {
-            const title = await runYtDlp(videoUrl, isAudio, tmpFile);
+            // Step 1: Get title via --skip-download --print title
+            let title = 'YouTube';
+            try {
+                title = execFileSync(YTDLP_PATH, [
+                    '--no-playlist', '--skip-download',
+                    '--print', 'title', videoUrl
+                ], { timeout: 15000 }).toString().trim() || 'YouTube';
+            } catch (_) {}
 
-            const outFile = isAudio ? `${tmpFile}.mp3` : `${tmpFile}.mp4`;
+            // Step 2: Download the actual file
+            await runYtDlp(videoUrl, isAudio, outTemplate);
 
-            if (!fs.existsSync(outFile)) {
-                throw new Error('Downloaded file not found after yt-dlp completed.');
-            }
+            // Step 3: Find the output file (extension may vary)
+            const files = fs.readdirSync(tmpDir).filter(f => f.startsWith(`wa_yt_${stamp}`));
+            if (!files.length) throw new Error('yt-dlp ran but produced no output file.');
 
+            const outFile = path.join(tmpDir, files[0]);
             const buffer = fs.readFileSync(outFile);
             fs.unlinkSync(outFile);
 
@@ -82,7 +92,6 @@ function runYtDlp(url, isAudio, outTemplate) {
                 '--audio-quality', '128K',
                 '--max-filesize', '50m',
                 '-o', `${outTemplate}.%(ext)s`,
-                '--print', 'title',
                 url
               ]
             : [
@@ -91,29 +100,22 @@ function runYtDlp(url, isAudio, outTemplate) {
                 '--merge-output-format', 'mp4',
                 '--max-filesize', '90m',
                 '-o', `${outTemplate}.%(ext)s`,
-                '--print', 'title',
                 url
               ];
 
         const proc = spawn(YTDLP_PATH, args);
-        let title = 'YouTube';
         let errOut = '';
 
-        proc.stdout.on('data', (d) => {
-            const line = d.toString().trim();
-            if (line) title = line;
-        });
-
-        proc.stderr.on('data', (d) => {
-            errOut += d.toString();
-        });
+        proc.stderr.on('data', (d) => { errOut += d.toString(); });
 
         proc.on('close', (code) => {
             if (code === 0) {
-                resolve(title);
+                resolve();
             } else {
-                const reason = errOut.split('\n').filter(l => l.includes('ERROR')).pop() || errOut.slice(-200);
-                reject(new Error(reason.replace('ERROR:', '').trim() || `yt-dlp exited with code ${code}`));
+                const reason = errOut.split('\n')
+                    .filter(l => l.includes('ERROR'))
+                    .pop() || errOut.slice(-300);
+                reject(new Error(reason.replace(/.*ERROR:?\s*/i, '').trim() || `yt-dlp exited with code ${code}`));
             }
         });
 
