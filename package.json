@@ -1,14 +1,13 @@
 {
   "name": "wa.exe",
   "version": "1.0.0",
-  "description": "WhatsApp Bot by R O L E X - LK",
+  "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "if command -v pkg >/dev/null; then pkg install ffmpeg -y; elif command -v apt >/dev/null; then sudo apt update && sudo apt install ffmpeg -y; fi && node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "D N Ariyawansha",
+  "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
